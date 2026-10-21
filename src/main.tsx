@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Check, Copy, Grid2X2, LockKeyhole, RotateCcw, UnlockKeyhole } from 'lucide-react'
-import { albertiDecrypt, albertiEncrypt, ALBERTI_INNER, ALBERTI_OUTER, decodeConfig, encodeConfig, grilleDecrypt, grilleEncrypt, grilleOrbits, validGrille, type CipherConfig } from './ciphers'
+import { albertiDecrypt, albertiEncrypt, ALBERTI_INNER, ALBERTI_OUTER, DEFAULT_PREPROCESS, decodeConfig, encodeConfig, grilleDecrypt, grilleEncrypt, grilleOrbits, preprocessText, validGrille, type CipherConfig, type PreprocessOptions } from './ciphers'
 import './style.css'
 
 type CipherId = 'alberti' | 'grille'
@@ -9,6 +9,7 @@ type CipherId = 'alberti' | 'grille'
 function App() {
   const [algorithm, setAlgorithm] = useState<CipherId>('alberti')
   const [plain, setPlain] = useState('INVIARERINFORZIDOMANI')
+  const [preprocess, setPreprocess] = useState<PreprocessOptions>(DEFAULT_PREPROCESS)
   const [encrypted, setEncrypted] = useState('')
   const [configOut, setConfigOut] = useState('')
   const [cipherInput, setCipherInput] = useState('')
@@ -31,6 +32,7 @@ function App() {
   const [copied, setCopied] = useState('')
 
   const orbits = useMemo(() => grilleOrbits(size, direction), [size, direction])
+  const normalizedPreview = useMemo(() => preprocessText(plain, preprocess), [plain, preprocess])
   const validAlphabet = outerAlphabet
   const validInnerAlphabet = innerAlphabet
   const alphabetError = [...validAlphabet].length < 2 || new Set([...validAlphabet]).size !== [...validAlphabet].length || new Set([...validInnerAlphabet]).size !== [...validInnerAlphabet].length || [...validInnerAlphabet].length !== [...validAlphabet].length
@@ -40,14 +42,15 @@ function App() {
     try {
       let config: CipherConfig
       let text: string
+      const normalized = preprocessText(plain, preprocess)
       if (algorithm === 'alberti') {
         if (alphabetError) throw new Error('Los alfabetos fijo y móvil deben tener la misma cantidad de símbolos únicos y al menos dos caracteres.')
-        config = { version: 1, algorithm, outerAlphabet: validAlphabet, innerAlphabet: validInnerAlphabet, offset, advance, periodLength, unsupported: albertiUnsupported, letterCase: albertiLetterCase }
-        text = albertiEncrypt(plain, validAlphabet, validInnerAlphabet, offset, advance, periodLength, albertiUnsupported, albertiLetterCase)
+        config = { version: 1, algorithm, outerAlphabet: validAlphabet, innerAlphabet: validInnerAlphabet, offset, advance, periodLength, unsupported: albertiUnsupported, letterCase: albertiLetterCase, preprocess }
+        text = albertiEncrypt(normalized, validAlphabet, validInnerAlphabet, offset, advance, periodLength, albertiUnsupported, albertiLetterCase)
       } else {
         if (!validGrille(size, holes, direction)) throw new Error(`Elige exactamente ${orbits.length} perforaciones, una por cada grupo de rotación.`)
-        const result = grilleEncrypt(plain, size, holes, direction, grilleMode, grilleKeep)
-        config = { version: 1, algorithm, size, holes, length: result.length, direction, mode: grilleMode, keep: grilleKeep }
+        const result = grilleEncrypt(normalized, size, holes, direction, grilleMode, grilleKeep)
+        config = { version: 1, algorithm, size, holes, length: result.length, direction, mode: grilleMode, keep: grilleKeep, preprocess }
         text = result.text
       }
       setEncrypted(text); setConfigOut(encodeConfig(config))
@@ -98,6 +101,15 @@ function App() {
           <div className="result-block"><div className="result-heading"><label className="field-label" htmlFor="decrypted">TEXTO DESCIFRADO</label>{decrypted && <button className="mini-copy" onClick={() => copy(decrypted, 'plain')}>{copied === 'plain' ? <Check size={13}/> : <Copy size={13}/>} {copied === 'plain' ? 'Copiado' : 'Copiar texto'}</button>}</div><textarea id="decrypted" className="message-field result-field" value={decrypted} onChange={event => setDecrypted(event.target.value)} placeholder="El texto recuperado aparecerá aquí…" spellCheck={false}/></div>
         </section>
       </div>
+      <section className="settings-section"><div className="settings-heading"><div><h2>Preprocesado del texto</h2><p>Se aplica antes del cifrado; las opciones viajan en la configuración para que el otro extremo use la misma normalización.</p></div></div>
+        <div className="preprocess-card setting-card">
+          <label><input type="checkbox" checked={preprocess.uppercase} onChange={e => setPreprocess(v => ({ ...v, uppercase: e.target.checked }))}/> Convertir a mayúsculas</label>
+          <label><input type="checkbox" checked={preprocess.removeDiacritics} onChange={e => setPreprocess(v => ({ ...v, removeDiacritics: e.target.checked }))}/> Quitar tildes y diacríticos (Ñ → N)</label>
+          <label><input type="checkbox" checked={preprocess.removeSpaces} onChange={e => setPreprocess(v => ({ ...v, removeSpaces: e.target.checked }))}/> Quitar espacios y saltos de línea</label>
+          <label className="preprocess-filter">Filtrar símbolos <select className="text-field" value={preprocess.keep} onChange={e => setPreprocess(v => ({ ...v, keep: e.target.value as PreprocessOptions['keep'] }))}><option value="all">Conservar todos</option><option value="letters">Solo letras</option><option value="alphanumeric">Letras y dígitos</option></select></label>
+          <div className="preview-label">VISTA PREVIA · {[...normalizedPreview].length} CARACTERES</div><div className="preprocess-preview mono">{normalizedPreview || 'El texto queda vacío con estas opciones.'}</div>
+        </div>
+      </section>
       <section className="settings-section"><div className="settings-heading"><div><h2>Configuración del cifrado</h2><p>Estos parámetros se generan aparte del mensaje cifrado.</p></div></div>
         {algorithm === 'alberti' ? <div className="settings-grid alberti-settings">
           <div className="setting-card"><label className="field-label" htmlFor="outer-alphabet">DISCO 1 · ANILLO EXTERIOR (PLANO)</label><input id="outer-alphabet" className="text-field mono" value={outerAlphabet} onChange={event => setOuterAlphabet(event.target.value)} spellCheck={false}/><div className="field-meta">Ejemplo histórico: 20 letras latinas y los dígitos 1–4.</div></div>

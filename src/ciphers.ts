@@ -2,11 +2,23 @@ export const ALBERTI_OUTER = 'ABCDEFGILMNOPQRSTVXZ1234'
 export const ALBERTI_INNER = 'usqomkhfdbacegilnprtxz&y'
 export const LATIN = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
-export type AlbertiConfig = { version: 1; algorithm: 'alberti'; outerAlphabet: string; innerAlphabet: string; offset: number; advance: number; periodLength: number; unsupported: 'remove' | 'preserve'; letterCase: 'preserve' | 'uppercase' }
-export type GrilleConfig = { version: 1; algorithm: 'grille'; size: number; holes: number[]; length: number; direction: 'clockwise' | 'counterclockwise'; mode: 'four' | 'untilDone'; keep: 'alphanumeric' | 'nonspace' }
+export type PreprocessOptions = { uppercase: boolean; removeDiacritics: boolean; removeSpaces: boolean; keep: 'all' | 'letters' | 'alphanumeric' }
+export const DEFAULT_PREPROCESS: PreprocessOptions = { uppercase: true, removeDiacritics: true, removeSpaces: true, keep: 'all' }
+export type AlbertiConfig = { version: 1; algorithm: 'alberti'; outerAlphabet: string; innerAlphabet: string; offset: number; advance: number; periodLength: number; unsupported: 'remove' | 'preserve'; letterCase: 'preserve' | 'uppercase'; preprocess?: PreprocessOptions }
+export type GrilleConfig = { version: 1; algorithm: 'grille'; size: number; holes: number[]; length: number; direction: 'clockwise' | 'counterclockwise'; mode: 'four' | 'untilDone'; keep: 'alphanumeric' | 'nonspace'; preprocess?: PreprocessOptions }
 export type CipherConfig = AlbertiConfig | GrilleConfig
 
 export function encodeConfig(config: CipherConfig): string { return JSON.stringify(config, null, 2) }
+
+export function preprocessText(input: string, options: PreprocessOptions): string {
+  let text = input.normalize('NFC')
+  if (options.removeDiacritics) text = text.normalize('NFD').replace(/\p{M}/gu, '').replace(/ñ/gi, match => match === 'Ñ' ? 'N' : 'n').normalize('NFC')
+  if (options.uppercase) text = text.toLocaleUpperCase('es')
+  if (options.removeSpaces) text = text.replace(/\s/gu, '')
+  if (options.keep === 'letters') text = [...text].filter(ch => /\p{L}/u.test(ch)).join('')
+  if (options.keep === 'alphanumeric') text = [...text].filter(ch => /[\p{L}\p{N}]/u.test(ch)).join('')
+  return text
+}
 
 export function decodeConfig(raw: string): CipherConfig {
   const source = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
@@ -21,6 +33,7 @@ export function decodeConfig(raw: string): CipherConfig {
     config.direction ??= 'clockwise'; config.mode ??= 'four'; config.keep ??= 'nonspace'
     if (!Number.isInteger(config.size) || config.size < 2 || config.size > 16 || !Array.isArray(config.holes) || !Number.isInteger(config.length) || config.length < 0 || !['clockwise', 'counterclockwise'].includes(config.direction) || !['four', 'untilDone'].includes(config.mode) || !['alphanumeric', 'nonspace'].includes(config.keep)) throw new Error('Los parámetros de la rejilla no son válidos.')
   }
+  if (config.preprocess && (typeof config.preprocess.uppercase !== 'boolean' || typeof config.preprocess.removeDiacritics !== 'boolean' || typeof config.preprocess.removeSpaces !== 'boolean' || !['all', 'letters', 'alphanumeric'].includes(config.preprocess.keep))) throw new Error('Las opciones de preprocesado no son válidas.')
   return config
 }
 
