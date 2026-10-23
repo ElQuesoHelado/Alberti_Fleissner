@@ -25,14 +25,23 @@ function App() {
   const [size, setSize] = useState(4)
   const [direction, setDirection] = useState<'clockwise' | 'counterclockwise'>('clockwise')
   const [grilleMode, setGrilleMode] = useState<'four' | 'untilDone'>('four')
-  const [grilleKeep, setGrilleKeep] = useState<'alphanumeric' | 'nonspace'>('nonspace')
-  const [holes, setHoles] = useState<number[]>(grilleOrbits(4).map(orbit => orbit[0]))
+  const [grilleKeep, setGrilleKeep] = useState<'alphanumeric' | 'nonspace'>('alphanumeric')
+  // Default 4x4 mask: X... / ...X / ..X. / .X..
+  const [holes, setHoles] = useState<number[]>([0, 7, 10, 13])
   const [encryptError, setEncryptError] = useState('')
   const [decryptError, setDecryptError] = useState('')
   const [copied, setCopied] = useState('')
 
   const orbits = useMemo(() => grilleOrbits(size, direction), [size, direction])
   const normalizedPreview = useMemo(() => preprocessText(plain, preprocess), [plain, preprocess])
+  const albertiRecoveryPreview = useMemo(() => {
+    try {
+      const cipher = albertiEncrypt(normalizedPreview, outerAlphabet, innerAlphabet, offset, advance, periodLength, albertiUnsupported, albertiLetterCase)
+      return { text: albertiDecrypt(cipher, outerAlphabet, innerAlphabet, offset, advance, periodLength, albertiUnsupported, albertiLetterCase), error: '' }
+    } catch (issue) {
+      return { text: '', error: issue instanceof Error ? issue.message : 'No se pudo calcular la vista previa.' }
+    }
+  }, [normalizedPreview, outerAlphabet, innerAlphabet, offset, advance, periodLength, albertiUnsupported, albertiLetterCase])
   const validAlphabet = outerAlphabet
   const validInnerAlphabet = innerAlphabet
   const alphabetError = [...validAlphabet].length < 2 || new Set([...validAlphabet]).size !== [...validAlphabet].length || new Set([...validInnerAlphabet]).size !== [...validInnerAlphabet].length || [...validInnerAlphabet].length !== [...validAlphabet].length
@@ -106,8 +115,9 @@ function App() {
           <label><input type="checkbox" checked={preprocess.uppercase} onChange={e => setPreprocess(v => ({ ...v, uppercase: e.target.checked }))}/> Convertir a mayúsculas</label>
           <label><input type="checkbox" checked={preprocess.removeDiacritics} onChange={e => setPreprocess(v => ({ ...v, removeDiacritics: e.target.checked }))}/> Quitar tildes y diacríticos (Ñ → N)</label>
           <label><input type="checkbox" checked={preprocess.removeSpaces} onChange={e => setPreprocess(v => ({ ...v, removeSpaces: e.target.checked }))}/> Quitar espacios y saltos de línea</label>
-          <label className="preprocess-filter">Filtrar símbolos <select className="text-field" value={preprocess.keep} onChange={e => setPreprocess(v => ({ ...v, keep: e.target.value as PreprocessOptions['keep'] }))}><option value="all">Conservar todos</option><option value="letters">Solo letras</option><option value="alphanumeric">Letras y dígitos</option></select></label>
+          <label className="preprocess-filter">Filtrar símbolos <select className="text-field" value={preprocess.keep} onChange={e => setPreprocess(v => ({ ...v, keep: e.target.value as PreprocessOptions['keep'] }))}><option value="all">Conservar todos</option><option value="letters">Solo A–Z</option><option value="alphanumeric">A–Z y 0–9</option></select></label>
           <div className="preview-label">VISTA PREVIA · {[...normalizedPreview].length} CARACTERES</div><div className="preprocess-preview mono">{normalizedPreview || 'El texto queda vacío con estas opciones.'}</div>
+          {algorithm === 'alberti' && <><div className="preview-label">TEXTO RECUPERABLE AL DESCIFRAR</div><div className={`preprocess-preview mono ${albertiRecoveryPreview.text !== normalizedPreview ? 'preview-warning' : ''}`}>{albertiRecoveryPreview.error || albertiRecoveryPreview.text || 'El texto queda vacío con estas opciones.'}</div>{albertiRecoveryPreview.text !== normalizedPreview && !albertiRecoveryPreview.error && <div className="field-meta preview-explanation">El texto recuperado difiere del preprocesado. Revisa los caracteres fuera del disco y la opción de conservarlos o eliminarlos.</div>}</>}
         </div>
       </section>
       <section className="settings-section"><div className="settings-heading"><div><h2>Configuración del cifrado</h2><p>Estos parámetros se generan aparte del mensaje cifrado.</p></div></div>
@@ -121,7 +131,7 @@ function App() {
         </div>
         : <div className="settings-grid grille-settings"><div className="setting-card grille-setting">
           <div className="setting-line"><div><label className="field-label" htmlFor="grid-size">TAMAÑO DE REJILLA</label><div className="size-controls"><input id="grid-size" className="text-field mono size-input" type="number" min="2" max="16" value={size} onChange={event => { const next = Math.min(16, Math.max(2, Number(event.target.value))); setSize(next); setHoles(grilleOrbits(next, direction).map(orbit => orbit[0])) }}/><span>× {size}</span></div></div><span className="hole-count">{holes.length}/{orbits.length} perforaciones</span></div>
-          <div className="grille-options"><label>Conservar <select value={grilleKeep} onChange={event => setGrilleKeep(event.target.value as typeof grilleKeep)}><option value="alphanumeric">Solo letras y dígitos</option><option value="nonspace">Todos los caracteres, sin espacios</option></select></label><label>Giro <select value={direction} onChange={event => { const next = event.target.value as typeof direction; setDirection(next); setHoles(grilleOrbits(size, next).map(orbit => orbit[0])) }}><option value="clockwise">⟳ Horario</option><option value="counterclockwise">⟲ Antihorario</option></select></label><label>Fin <select value={grilleMode} onChange={event => setGrilleMode(event.target.value as typeof grilleMode)}><option value="four">Después de 4 giros</option><option value="untilDone">Al terminar las letras</option></select></label></div>
+          <div className="grille-options"><label>Conservar <select value={grilleKeep} onChange={event => setGrilleKeep(event.target.value as typeof grilleKeep)}><option value="alphanumeric">Solo A–Z y 0–9</option><option value="nonspace">Todos los caracteres, sin espacios</option></select></label><label>Giro <select value={direction} onChange={event => { const next = event.target.value as typeof direction; setDirection(next); setHoles(grilleOrbits(size, next).map(orbit => orbit[0])) }}><option value="clockwise">⟳ Horario</option><option value="counterclockwise">⟲ Antihorario</option></select></label><label>Fin <select value={grilleMode} onChange={event => setGrilleMode(event.target.value as typeof grilleMode)}><option value="four">Después de 4 giros</option><option value="untilDone">Al terminar las letras</option></select></label></div>
           <div className="grille-visual" style={{ '--grid-size': size } as React.CSSProperties}>{Array.from({ length: size * size }, (_, cell) => { const orbit = orbits.find(candidate => candidate.includes(cell))!; const chosen = holes.find(hole => orbit.includes(hole)); const selected = chosen !== undefined; return <button key={cell} onClick={() => toggleOrbit(orbit, cell)} className={`${selected ? 'hole ' : ''}${chosen === cell ? 'chosen' : ''}`} title={`Grupo ${orbits.indexOf(orbit) + 1}${selected ? ', perforación en esta órbita' : ''}`}>{chosen === cell ? <span/> : null}</button> })}</div>
           <div className="grille-help">Elige una perforación por órbita de giro. En tamaño impar, el centro forma una órbita de una sola casilla.</div></div><div className="setting-card grille-info"><strong>{size * size} celdas por bloque</strong><p>El cifrado se lee por filas. Las casillas sin usar se marcan con · y la clave guarda la longitud para descifrar sin ambigüedad.</p></div></div>}
       </section>

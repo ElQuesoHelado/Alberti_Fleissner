@@ -1,0 +1,189 @@
+\documentclass[aspectratio=169,11pt]{beamer}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-nodecimaldot]{babel}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb,booktabs,tabularx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\definecolor{navy}{RGB}{0,32,91}
+\definecolor{softblue}{RGB}{235,240,248}
+\usetheme{Madrid}
+\usecolortheme{default}
+\setbeamercolor{structure}{fg=navy}
+\setbeamercolor{title}{fg=white}
+\setbeamercolor{subtitle}{fg=white}
+\setbeamercolor{frametitle}{fg=navy,bg=softblue}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+\setbeamertemplate{itemize item}{\color{navy}$\blacktriangleright$}
+
+\title{Cifrados clásicos}
+\subtitle{Disco de Alberti y rejilla giratoria de Fleissner}
+\author[Alva Cornejo et al.]{\texorpdfstring{Alva Cornejo, Jose Javier \and Carpio Paiva, Cesar Gonzalo\\Palomino Rivadeneyra, Misael Jesús \and Zapana Pariapaza, Gonzalo Rodrigo}{Alva Cornejo, Jose Javier; Carpio Paiva, Cesar Gonzalo; Palomino Rivadeneyra, Misael Jesús; Zapana Pariapaza, Gonzalo Rodrigo}}
+\institute{Universidad Nacional de San Agustín\\Escuela Profesional de Ciencia de la Computación\\Seguridad en computación}
+\date{Arequipa -- Perú, \today}
+
+\newcommand{\captura}[2]{%
+  \begin{minipage}[t]{.48\textwidth}
+    \centering\includegraphics[width=\linewidth,height=4.4cm,keepaspectratio]{#1}\\[.3em]
+    \scriptsize #2
+  \end{minipage}}
+
+\begin{document}
+
+\begin{frame}[plain]
+  \titlepage
+\end{frame}
+
+\begin{frame}{Aplicación y repositorio}
+  \begin{block}{Aplicación web}
+    \href{https://elquesohelado.github.io/Alberti_Fleissner/}{Abrir la aplicación}\\
+    \url{https://elquesohelado.github.io/Alberti_Fleissner/}
+  \end{block}
+  \begin{block}{Código fuente}
+    \href{https://github.com/ElQuesoHelado/Alberti_Fleissner}{Ver el repositorio en GitHub}\\
+    \url{https://github.com/ElQuesoHelado/Alberti_Fleissner}
+  \end{block}
+\end{frame}
+
+\begin{frame}{Objetivo y aplicación}
+  \begin{itemize}
+    \item Implementación didáctica de dos métodos clásicos: sustitución polialfabética y transposición.
+    \item Aplicación web que cifra y descifra en el navegador.
+    \item \textbf{Plataforma:} TypeScript, React y Vite.
+    \item El mensaje y su configuración JSON se comparten por separado.
+    \item No son métodos adecuados para proteger información sensible.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Preprocesado compartido}
+  \begin{block}{Perfil utilizado en los resultados}
+    Mayúsculas; eliminación de tildes y diacríticos (\texttt{Ñ} $\to$ \texttt{N}); eliminación de espacios, signos y otros símbolos. Se conserva el alfabeto \texttt{ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789}.
+  \end{block}
+  \begin{itemize}
+    \item La interfaz muestra una vista previa del texto normalizado.
+    \item El JSON contiene los parámetros y la longitud original para que el receptor use las mismas convenciones.
+    \item El descifrado recupera el texto normalizado; los espacios, tildes o caja eliminados no se pueden reconstruir.
+    \item Ejemplo: \texttt{Ataque al amanecer!} $\to$ \texttt{ATAQUEALAMANECER}.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Disco de Alberti: principio}
+  \begin{columns}[T]
+    \column{.59\textwidth}
+      \begin{itemize}
+        \item Dos alfabetos alineados: exterior para el texto claro e interior para el cifrado.
+        \item Un giro inicial y un incremento periódico cambian la sustitución.
+        \item Cada símbolo se sustituye por el símbolo interior de la posición girada.
+      \end{itemize}
+    \column{.38\textwidth}
+      \begin{block}{Posición cifrante}
+        \[
+        C_i=(P_i+o+\lfloor i/q\rfloor a)\bmod m
+        \]
+        \scriptsize $P_i$: posición clara; $o$: giro inicial; $a$: incremento; $q$: período; $m$: longitud del disco.
+      \end{block}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Alberti: alfabeto, clave y límites}
+  \small
+  \begin{block}{Alfabetos predeterminados (24 símbolos cada uno)}
+    Exterior: \texttt{ABCDEFGILMNOPQRSTVXZ1234}\\
+    Interior: \texttt{usqomkhfdbacegilnprtxz\&y}
+  \end{block}
+  \begin{itemize}
+    \item Clave compartida: dos alfabetos, giro inicial, incremento, período y política para símbolos ajenos.
+    \item Se exige igual longitud y símbolos únicos en ambos alfabetos; período $\geq 1$.
+    \item Letras fuera del disco y puntuación se conservan o eliminan según configuración; no avanzan el contador.
+    \item Variante educativa: no incluye señalización histórica de cambios de giro. No es criptografía moderna.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Alberti: proceso de cifrado}
+  \begin{enumerate}
+    \item Normalizar el texto según las opciones seleccionadas.
+    \item Buscar cada símbolo en el anillo exterior.
+    \item Calcular el giro según $o$, $a$ y $q$; sustituir usando el anillo interior.
+    \item Aplicar la política para caracteres que no están en los discos.
+    \item Compartir el criptograma y el JSON de configuración.
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}{Alberti: descifrado}
+  \begin{enumerate}
+    \item Cargar criptograma y JSON generado al cifrar.
+    \item Validar/recuperar alfabetos, giro, incremento y período.
+    \item Contar los símbolos cifrables en el mismo orden.
+    \item Buscar en el anillo interior y restar el giro módulo $m$.
+    \item Resultado: texto claro normalizado, sin restaurar información eliminada.
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}{Alberti: capturas}
+  \centering\captura{alberti_1.png}{Cifrado y descifrado}\hfill\captura{alberti_2.png}{Configuración}
+\end{frame}
+
+\begin{frame}{Rejilla giratoria: principio y clave}
+  \begin{itemize}
+    \item Cifrado de transposición: conserva los símbolos y cambia su orden.
+    \item La máscara de 4×4 se gira en sentido horario en cuatro posiciones.
+    \item En cada posición los huecos se recorren por filas; cada celda se visita una vez.
+    \item La longitud original se comparte para quitar el relleno al descifrar.
+    \item El tablero cifrado se lee por filas; el descifrado recorre las mismas posiciones.
+  \end{itemize}
+  \begin{block}{Restricciones}
+    \texttt{X... / ...X / ..X. / .X..} (\texttt{X}: hueco; \texttt{.}: cerrado). Se añade \texttt{X} al final hasta completar el bloque de 16.
+  \end{block}
+\end{frame}
+
+\begin{frame}{Rejilla: proceso de cifrado}
+  \begin{enumerate}
+    \item Preprocesar y filtrar los caracteres.
+    \item Validar las perforaciones y la cobertura de la rejilla.
+    \item Escribir el texto recorriendo cada orientación.
+    \item Rellenar según el modo y leer por filas.
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}{Rejilla: descifrado}
+  \begin{enumerate}
+    \item Recibir criptograma y longitud original.
+    \item Colocar el texto cifrado por filas en el bloque de 4×4.
+    \item Recorrer huecos por filas en las cuatro posiciones horarias.
+    \item Detenerse en la longitud original para descartar el relleno \texttt{X}.
+  \end{enumerate}
+  \begin{alertblock}{Límites}
+    Si faltan caracteres o metadatos no se garantiza la recuperación. El filtro y el preprocesado eliminan información de forma irreversible.
+  \end{alertblock}
+\end{frame}
+
+\begin{frame}{Rejilla: capturas}
+  \centering\captura{rejilla_1.png}{Cifrado y descifrado}\hfill\captura{rejilla_2.png}{Preprocesado y configuración}
+\end{frame}
+
+\begin{frame}{Código implementado}
+  \begin{block}{Dónde está el código}
+    \texttt{src/ciphers.ts}: preprocesado Unicode, validación de alfabetos, cifrado/descifrado de Alberti, validación de órbitas y cifrado/descifrado de rejilla.\\[.4em]
+    \texttt{src/main.tsx}: interfaz React, selección de parámetros, configuración JSON y vista previa.\\[.4em]
+    \texttt{src/style.css}: presentación de la aplicación.
+  \end{block}
+  \begin{itemize}
+    \item El informe adjunto incluye el listado de \texttt{src/ciphers.ts}.
+    \item La configuración permite que emisor y receptor compartan la misma clave y convención.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Conclusiones}
+  \begin{itemize}
+    \item Alberti sustituye símbolos con un alfabeto que cambia según el período.
+    \item Fleissner transpone símbolos usando una rejilla rotatoria.
+    \item La interoperabilidad depende de compartir alfabeto/clave o rejilla/configuración y longitud.
+    \item El preprocesado estandariza entradas, pero la normalización puede ser irreversible.
+    \item Ambos algoritmos son demostraciones históricas, no protección de datos actual.
+  \end{itemize}
+\end{frame}
+
+\end{document}

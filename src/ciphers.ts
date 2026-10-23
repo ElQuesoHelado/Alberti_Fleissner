@@ -3,7 +3,7 @@ export const ALBERTI_INNER = 'usqomkhfdbacegilnprtxz&y'
 export const LATIN = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
 export type PreprocessOptions = { uppercase: boolean; removeDiacritics: boolean; removeSpaces: boolean; keep: 'all' | 'letters' | 'alphanumeric' }
-export const DEFAULT_PREPROCESS: PreprocessOptions = { uppercase: true, removeDiacritics: true, removeSpaces: true, keep: 'all' }
+export const DEFAULT_PREPROCESS: PreprocessOptions = { uppercase: true, removeDiacritics: true, removeSpaces: true, keep: 'alphanumeric' }
 export type AlbertiConfig = { version: 1; algorithm: 'alberti'; outerAlphabet: string; innerAlphabet: string; offset: number; advance: number; periodLength: number; unsupported: 'remove' | 'preserve'; letterCase: 'preserve' | 'uppercase'; preprocess?: PreprocessOptions }
 export type GrilleConfig = { version: 1; algorithm: 'grille'; size: number; holes: number[]; length: number; direction: 'clockwise' | 'counterclockwise'; mode: 'four' | 'untilDone'; keep: 'alphanumeric' | 'nonspace'; preprocess?: PreprocessOptions }
 export type CipherConfig = AlbertiConfig | GrilleConfig
@@ -15,8 +15,8 @@ export function preprocessText(input: string, options: PreprocessOptions): strin
   if (options.removeDiacritics) text = text.normalize('NFD').replace(/\p{M}/gu, '').replace(/ñ/gi, match => match === 'Ñ' ? 'N' : 'n').normalize('NFC')
   if (options.uppercase) text = text.toLocaleUpperCase('es')
   if (options.removeSpaces) text = text.replace(/\s/gu, '')
-  if (options.keep === 'letters') text = [...text].filter(ch => /\p{L}/u.test(ch)).join('')
-  if (options.keep === 'alphanumeric') text = [...text].filter(ch => /[\p{L}\p{N}]/u.test(ch)).join('')
+  if (options.keep === 'letters') text = [...text].filter(ch => /[A-Za-z]/u.test(ch)).join('')
+  if (options.keep === 'alphanumeric') text = [...text].filter(ch => /[A-Za-z0-9]/u.test(ch)).join('')
   return text
 }
 
@@ -110,7 +110,7 @@ export function validGrille(size: number, holes: number[], direction: 'clockwise
 }
 
 export function prepareGrilleText(input: string, keep: 'alphanumeric' | 'nonspace') {
-  return [...input].filter(ch => keep === 'alphanumeric' ? /[\p{L}\p{N}]/u.test(ch) : !/\s/u.test(ch))
+  return [...input].filter(ch => keep === 'alphanumeric' ? /[A-Za-z0-9]/u.test(ch) : !/\s/u.test(ch))
 }
 
 export function grilleEncrypt(input: string, size: number, holes: number[], direction: 'clockwise' | 'counterclockwise' = 'clockwise', mode: 'four' | 'untilDone' = 'four', keep: 'alphanumeric' | 'nonspace' = 'nonspace'): { text: string; length: number } {
